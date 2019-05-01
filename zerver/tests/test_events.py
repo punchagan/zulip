@@ -2561,6 +2561,7 @@ class EventsRegisterTest(ZulipTestCase):
 
         events = self.do_test(
             lambda: do_upload(),
+            event_types=['attachment', 'subscription'],
             num_events=1, state_change_expected=False)
         error = schema_checker('events[0]', events[0])
         self.assert_on_error(error)
@@ -2591,6 +2592,7 @@ class EventsRegisterTest(ZulipTestCase):
         body = "First message ...[zulip.txt](http://localhost:9991" + data['uri'] + ")"
         events = self.do_test(
             lambda: self.send_stream_message(self.example_email("hamlet"), "Denmark", body, "test"),
+            event_types=['attachment', 'subscription', 'message'],
             num_events=2)
         error = schema_checker('events[0]', events[0])
         self.assert_on_error(error)
@@ -2607,6 +2609,7 @@ class EventsRegisterTest(ZulipTestCase):
 
         events = self.do_test(
             lambda: self.client_delete("/json/attachments/%s" % (entry.id,)),
+            event_types=['attachment', 'subscription'],
             num_events=1, state_change_expected=False)
         error = schema_checker('events[0]', events[0])
         self.assert_on_error(error)
