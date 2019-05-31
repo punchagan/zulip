@@ -490,6 +490,15 @@ def fetch_tweet_data(tweet_id: str) -> Optional[Dict[str, Any]]:
                 return None
     return res
 
+def open_graph_to_tweet_data(tweet_id: str, url: str, metadata: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    tweet_data = {}
+    name = url.split('twitter.com/')[-1].split('/')[0]
+    screen_name = metadata['title'].rsplit(' on ', 1)[0]
+    tweet_data['user'] = dict(profile_image_url=metadata['image'],
+                              name=name, screen_name=screen_name)
+    tweet_data['full_text'] = metadata['description'][1:-1]
+    return tweet_data
+
 HEAD_START_RE = re.compile('^head[ >]')
 HEAD_END_RE = re.compile('^/head[ >]')
 META_START_RE = re.compile('^meta[ >]')
@@ -1030,30 +1039,6 @@ class InlineInterestingLinkProcessor(markdown.treeprocessors.Treeprocessor):
                 self.handle_image_inlining(root, found_url)
                 continue
 
-            tweet_id = get_tweet_id(url)
-            if tweet_id is not None:
-                if rendered_tweet_count >= self.TWITTER_MAX_TO_PREVIEW:
-                    # Only render at most one tweet per message
-                    continue
-
-                try:
-                    data = fetch_tweet_data(tweet_id)
-                except Exception:
-                    # We put this in its own try-except because it requires external
-                    # connectivity. If Twitter flakes out, we don't want to not-render
-                    # the entire message; we just want to not show the Twitter preview.
-                    bugdown_logger.warning(traceback.format_exc())
-                    continue
-
-                if data is not None:
-                    # We successfully fetched data from twitter
-                    twitter_data = self.twitter_link(url, data)
-                    rendered_tweet_count += 1
-                    div = markdown.util.etree.SubElement(root, "div")
-                    div.set("class", "inline-preview-twitter")
-                    div.insert(0, twitter_data)
-                    continue
-
             youtube = self.youtube_image(url)
             if youtube is not None:
                 yt_id = self.youtube_id(url)
@@ -1074,12 +1059,30 @@ class InlineInterestingLinkProcessor(markdown.treeprocessors.Treeprocessor):
             except NotFoundInCache:
                 self.markdown.zulip_message.links_for_preview.add(url)
                 continue
+
             if extracted_data:
+                tweet_id = get_tweet_id(url)
+                if tweet_id is not None:
+                    if rendered_tweet_count >= self.TWITTER_MAX_TO_PREVIEW:
+                        # Only render at most one tweet per message
+                        continue
+
+                    data = open_graph_to_tweet_data(tweet_id, url, extracted_data)
+                    if data is not None:
+                        # We successfully fetched data from twitter
+                        twitter_data = self.twitter_link(url, data)
+                        rendered_tweet_count += 1
+                        div = markdown.util.etree.SubElement(root, "div")
+                        div.set("class", "inline-preview-twitter")
+                        div.insert(0, twitter_data)
+                        continue
+
                 add_embed(root, url, extracted_data)
                 if self.vimeo_id(url):
                     title = self.vimeo_title(extracted_data)
                     if title:
                         found_url.family.child.text = title
+                    continue
 
 class Avatar(markdown.inlinepatterns.Pattern):
     def handleMatch(self, match: Match[str]) -> Optional[Element]:
