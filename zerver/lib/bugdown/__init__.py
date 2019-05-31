@@ -856,74 +856,59 @@ class InlineInterestingLinkProcessor(markdown.treeprocessors.Treeprocessor):
         set_text(text[current_index:])
         return p
 
-    def twitter_link(self, url: str) -> Optional[Element]:
-        tweet_id = get_tweet_id(url)
+    def twitter_link(self, url: str, tweet_data: Dict) -> Optional[Element]:
+        user = tweet_data['user']  # type: Dict[str, Any]
+        tweet = markdown.util.etree.Element("div")
+        tweet.set("class", "twitter-tweet")
+        img_a = markdown.util.etree.SubElement(tweet, 'a')
+        img_a.set("href", url)
+        img_a.set("target", "_blank")
+        profile_img = markdown.util.etree.SubElement(img_a, 'img')
+        profile_img.set('class', 'twitter-avatar')
+        # For some reason, for, e.g. tweet 285072525413724161,
+        # python-twitter does not give us a
+        # profile_image_url_https, but instead puts that URL in
+        # profile_image_url. So use _https if available, but fall
+        # back gracefully.
+        image_url = user.get('profile_image_url_https', user['profile_image_url'])
+        profile_img.set('src', image_url)
 
-        if tweet_id is None:
-            return None
+        text = html.unescape(tweet_data['full_text'])
+        urls = tweet_data.get('urls', [])
+        user_mentions = tweet_data.get('user_mentions', [])
+        media = tweet_data.get('media', [])  # type: List[Dict[str, Any]]
+        p = self.twitter_text(text, urls, user_mentions, media)
+        tweet.append(p)
 
-        try:
-            res = fetch_tweet_data(tweet_id)
-            if res is None:
-                return None
-            user = res['user']  # type: Dict[str, Any]
-            tweet = markdown.util.etree.Element("div")
-            tweet.set("class", "twitter-tweet")
-            img_a = markdown.util.etree.SubElement(tweet, 'a')
-            img_a.set("href", url)
-            img_a.set("target", "_blank")
-            profile_img = markdown.util.etree.SubElement(img_a, 'img')
-            profile_img.set('class', 'twitter-avatar')
-            # For some reason, for, e.g. tweet 285072525413724161,
-            # python-twitter does not give us a
-            # profile_image_url_https, but instead puts that URL in
-            # profile_image_url. So use _https if available, but fall
-            # back gracefully.
-            image_url = user.get('profile_image_url_https', user['profile_image_url'])
-            profile_img.set('src', image_url)
+        span = markdown.util.etree.SubElement(tweet, 'span')
+        span.text = "- %s (@%s)" % (user['name'], user['screen_name'])
 
-            text = html.unescape(res['full_text'])
-            urls = res.get('urls', [])
-            user_mentions = res.get('user_mentions', [])
-            media = res.get('media', [])  # type: List[Dict[str, Any]]
-            p = self.twitter_text(text, urls, user_mentions, media)
-            tweet.append(p)
+        # Add image previews
+        for media_item in media:
+            # Only photos have a preview image
+            if media_item['type'] != 'photo':
+                continue
 
-            span = markdown.util.etree.SubElement(tweet, 'span')
-            span.text = "- %s (@%s)" % (user['name'], user['screen_name'])
+            # Find the image size that is smaller than
+            # TWITTER_MAX_IMAGE_HEIGHT px tall or the smallest
+            size_name_tuples = list(media_item['sizes'].items())
+            size_name_tuples.sort(reverse=True,
+                                  key=lambda x: x[1]['h'])
+            for size_name, size in size_name_tuples:
+                if size['h'] < self.TWITTER_MAX_IMAGE_HEIGHT:
+                    break
 
-            # Add image previews
-            for media_item in media:
-                # Only photos have a preview image
-                if media_item['type'] != 'photo':
-                    continue
+            media_url = '%s:%s' % (media_item['media_url_https'], size_name)
+            img_div = markdown.util.etree.SubElement(tweet, 'div')
+            img_div.set('class', 'twitter-image')
+            img_a = markdown.util.etree.SubElement(img_div, 'a')
+            img_a.set('href', media_item['url'])
+            img_a.set('target', '_blank')
+            img_a.set('title', media_item['url'])
+            img = markdown.util.etree.SubElement(img_a, 'img')
+            img.set('src', media_url)
 
-                # Find the image size that is smaller than
-                # TWITTER_MAX_IMAGE_HEIGHT px tall or the smallest
-                size_name_tuples = list(media_item['sizes'].items())
-                size_name_tuples.sort(reverse=True,
-                                      key=lambda x: x[1]['h'])
-                for size_name, size in size_name_tuples:
-                    if size['h'] < self.TWITTER_MAX_IMAGE_HEIGHT:
-                        break
-
-                media_url = '%s:%s' % (media_item['media_url_https'], size_name)
-                img_div = markdown.util.etree.SubElement(tweet, 'div')
-                img_div.set('class', 'twitter-image')
-                img_a = markdown.util.etree.SubElement(img_div, 'a')
-                img_a.set('href', media_item['url'])
-                img_a.set('target', '_blank')
-                img_a.set('title', media_item['url'])
-                img = markdown.util.etree.SubElement(img_a, 'img')
-                img.set('src', media_url)
-
-            return tweet
-        except Exception:
-            # We put this in its own try-except because it requires external
-            # connectivity. If Twitter flakes out, we don't want to not-render
-            # the entire message; we just want to not show the Twitter preview.
-            bugdown_logger.warning(traceback.format_exc())
-            return None
+        return tweet
 
     def get_url_data(self, e: Element) -> Optional[Tuple[str, str]]:
         if e.tag == "a":
@@ -1045,19 +1030,30 @@ class InlineInterestingLinkProcessor(markdown.treeprocessors.Treeprocessor):
                 self.handle_image_inlining(root, found_url)
                 continue
 
-            if get_tweet_id(url) is not None:
+            tweet_id = get_tweet_id(url)
+            if tweet_id is not None:
                 if rendered_tweet_count >= self.TWITTER_MAX_TO_PREVIEW:
                     # Only render at most one tweet per message
                     continue
-                twitter_data = self.twitter_link(url)
-                if twitter_data is None:
-                    # This link is not actually a tweet known to twitter
+
+                try:
+                    data = fetch_tweet_data(tweet_id)
+                except Exception:
+                    # We put this in its own try-except because it requires external
+                    # connectivity. If Twitter flakes out, we don't want to not-render
+                    # the entire message; we just want to not show the Twitter preview.
+                    bugdown_logger.warning(traceback.format_exc())
                     continue
-                rendered_tweet_count += 1
-                div = markdown.util.etree.SubElement(root, "div")
-                div.set("class", "inline-preview-twitter")
-                div.insert(0, twitter_data)
-                continue
+
+                if data is not None:
+                    # We successfully fetched data from twitter
+                    twitter_data = self.twitter_link(url, data)
+                    rendered_tweet_count += 1
+                    div = markdown.util.etree.SubElement(root, "div")
+                    div.set("class", "inline-preview-twitter")
+                    div.insert(0, twitter_data)
+                    continue
+
             youtube = self.youtube_image(url)
             if youtube is not None:
                 yt_id = self.youtube_id(url)
