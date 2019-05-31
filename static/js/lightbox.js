@@ -61,8 +61,6 @@ function display_video(payload) {
     var source;
     if (payload.type === "youtube-video") {
         source = "https://www.youtube.com/embed/" + payload.source;
-    } else if (payload.type === "vimeo-video") {
-        source = "https://player.vimeo.com/video/" + payload.source;
     }
 
     var iframe = $("<iframe></iframe>");
@@ -95,7 +93,6 @@ exports.open = function (image, options) {
     // if wrapped in the .youtube-video class, it will be length = 1, and therefore
     // cast to true.
     var is_youtube_video = !!$image.closest(".youtube-video").length;
-    var is_vimeo_video = !!$image.closest(".vimeo-video").length;
     var is_embed_video = !!$image.closest(".embed-video").length;
 
     // check if image is descendent of #preview_content
@@ -114,9 +111,6 @@ exports.open = function (image, options) {
         var $url = $parent.attr("href");
         if (is_youtube_video) {
             $type = "youtube-video";
-            $source = $parent.attr("data-id");
-        } else if (is_vimeo_video) {
-            $type = "vimeo-video";
             $source = $parent.attr("data-id");
         } else if (is_embed_video) {
             $type = "embed-video";
