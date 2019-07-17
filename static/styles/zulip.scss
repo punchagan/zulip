@@ -1018,8 +1018,13 @@ td.pointer {
     border-right: 1px solid hsl(0, 0%, 88%);
 }
 
+$mention-background-color: hsl(8, 94%, 94%);
+
 .mention .messagebox {
-    background-color: hsl(8, 94%, 94%);
+    background-color: $mention-background-color;
+    .data-container::after {
+        background: linear-gradient(0deg, $mention-background-color, transparent 100%) !important;
+    }
 }
 
 .messagebox .message_top_line {
