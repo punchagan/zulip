@@ -1012,6 +1012,11 @@ td.pointer {
     box-shadow:
         inset 2px 0px 0px 0px hsl(0, 0%, 27%),
         -1px 0px 0px 0px hsl(0, 0%, 27%);
+    .data-container::after {
+        // Using the same color hsla(192, 19%, 75%, 0.2) doesn't look good because of the 0.2 alpha
+        // background: linear-gradient(0deg, hsla(192, 19%, 75%, 0.2), transparent 100%) !important;
+        background: linear-gradient(0deg, hsl(192, 19%, 95%), transparent 100%) !important;
+    }
 }
 
 .message-header-contents {
