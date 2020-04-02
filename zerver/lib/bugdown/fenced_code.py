@@ -347,6 +347,9 @@ class FencedBlockPreprocessor(markdown.preprocessors.Preprocessor):
                                    noclasses=self.codehilite_conf['noclasses'][0])
 
             code = highliter.hilite()
+            # FIXME: Do this better!!
+            data_attribute = 'data-codehilite-language="%s"' % lang or 'text'
+            code = code.replace('>', data_attribute + '>', 1)
         else:
             code = CODE_WRAP % (langclass, self._escape(text))
 
