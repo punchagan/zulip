@@ -4,6 +4,7 @@ const render_bookend = require('../templates/bookend.hbs');
 const render_message_group = require('../templates/message_group.hbs');
 const render_recipient_row = require('../templates/recipient_row.hbs');
 const render_single_message = require('../templates/single_message.hbs');
+const settings_data = require("./settings_data");
 
 function MessageListView(list, table_name, collapse_messages) {
     this.list = list;
@@ -503,6 +504,19 @@ MessageListView.prototype = {
         const content = row.find('.message_content');
 
         rendered_markdown.update_elements(content);
+
+        content.find('.codehilite').each(function () {
+            const $codehilite = $(this);
+            const code_lang = $codehilite.data('codehilite-language');
+            if (code_lang in settings_data.language_playgrounds) {
+                const url = new URL(settings_data.language_playgrounds[code_lang]);
+                const capitalize = (x) => {return x.charAt(0).toUpperCase() + x.slice(1);};
+                const title = `View in ${capitalize(code_lang)} playground`;
+                url.searchParams.set("code", $codehilite.text());
+                $codehilite.append(
+                    `<a class="code-external-link" target="_blank" title="${title}" href="${url.toString()}"><i class="fa fa-external-link"></i></button>`);
+            }
+        });
 
         const id = rows.id(row);
         message_edit.maybe_show_edit(row, id);

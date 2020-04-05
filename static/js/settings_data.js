@@ -47,3 +47,7 @@ exports.get_time_preferences = function (user_timezone) {
         format: "h:mm A",
     };
 };
+
+exports.language_playgrounds = {
+    "rust": "https://play.rust-lang.org"
+}

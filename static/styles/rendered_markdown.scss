@@ -416,6 +416,11 @@ code {
     display: block !important;
     border: none !important;
     background: none !important;
+    a.code-external-link {
+        position: absolute;
+        right: 4px;
+        top: 12px;
+    }
 }
 
 pre {
