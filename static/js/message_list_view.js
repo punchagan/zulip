@@ -509,10 +509,15 @@ MessageListView.prototype = {
             const $codehilite = $(this);
             const code_lang = $codehilite.data('codehilite-language');
             if (code_lang in settings_data.language_playgrounds) {
-                const url = new URL(settings_data.language_playgrounds[code_lang]);
+                const lang_settings = settings_data.language_playgrounds[code_lang];
+                const url = new URL(lang_settings.url);
                 const capitalize = (x) => {return x.charAt(0).toUpperCase() + x.slice(1);};
                 const title = `View in ${capitalize(code_lang)} playground`;
-                url.searchParams.set("code", $codehilite.text());
+                if (lang_settings.type === "query"){
+                    url.searchParams.set("code", $codehilite.text());
+                } else {
+                    url.hash = `${lang_settings.param_name}=${$codehilite.text()}`;
+                }
                 $codehilite.append(
                     `<a class="code-external-link" target="_blank" title="${title}" href="${url.toString()}"><i class="fa fa-external-link"></i></button>`);
             }

@@ -49,5 +49,6 @@ exports.get_time_preferences = function (user_timezone) {
 };
 
 exports.language_playgrounds = {
-    "rust": "https://play.rust-lang.org"
+    "rust": {url: "https://play.rust-lang.org", type: "query", param_name: "code"},
+    "lean": {url: "https://leanprover.github.io/live/latest/", type: "hash", param_name: "code"}
 }
